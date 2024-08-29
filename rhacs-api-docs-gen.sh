@@ -157,6 +157,9 @@ create_topic_map() {
     # Print the topic map content
     print_message $YELLOW "🚩 Please update the topic_map.yml file with the following content:\n\n"
     print_message $NC "$topic_map"
+
+    # copy the api dir to the /openshift-docs/api
+    cp -r api /openshift-docs/
 }
 
 # Function to clean up generated files

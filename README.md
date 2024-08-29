@@ -17,7 +17,7 @@ To generate the documentation:
    ```
 2. Run the docker container to generate the documentation:
    ```bash
-    docker run --rm -it -v "$(pwd)":/rhacs-api-docs-gen quay.io/ganelson/rhacs-api-docs-gen generate
+    docker run --rm -it -v "$(pwd)":/openshift-docs quay.io/ganelson/rhacs-api-docs-gen generate
     ```
 3. Enter the version of RHACS you want to generate the documentation for:
    ```bash
