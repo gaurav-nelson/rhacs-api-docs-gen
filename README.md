@@ -6,16 +6,20 @@ This is a simple tool to generate API documentation for RHACS. It uses the [Open
 
 To generate the documentation:
 
-1. Open your `openshift-docs` repository and create a new branch.
+1. Open your `openshift-docs` repository and create a new branch:
    ```bash
     cd openshift-docs
     git checkout -b <branch-name>
     ```
-2. Run the docker container to generate the documentation.
+2. Pull the latest image:
+   ```bash
+    docker pull quay.io/ganelson/rhacs-api-docs-gen
+   ```
+2. Run the docker container to generate the documentation:
    ```bash
     docker run --rm -it -v "$(pwd)":/rhacs-api-docs-gen quay.io/ganelson/rhacs-api-docs-gen generate
     ```
-3. Enter the version of RHACS you want to generate the documentation for.
+3. Enter the version of RHACS you want to generate the documentation for:
    ```bash
     Please provide the version number of the RHACS release (e.g., 4.5.1): <version>
     ```
