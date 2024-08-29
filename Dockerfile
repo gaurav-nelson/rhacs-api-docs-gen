@@ -14,4 +14,4 @@ COPY . .
 RUN chmod +x rhacs-api-docs-gen.sh
 
 # Entrypoint
-ENTRYPOINT ["bash", "rhacs-api-docs-gen.sh"]
+ENTRYPOINT ["bash", "/rhacs-api-docs-gen/rhacs-api-docs-gen.sh"]
