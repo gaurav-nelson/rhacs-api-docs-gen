@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y nodejs
 WORKDIR /rhacs-api-docs-gen
 
 # Copy the current directory contents into the container at /rhacs-api-docs-gen
-COPY . .
+COPY . /rhacs-api-docs-gen
 
 # Make the script executable
-RUN chmod +x rhacs-api-docs-gen.sh
+RUN chmod +x /rhacs-api-docs-gen/rhacs-api-docs-gen.sh
 
 # Entrypoint
 ENTRYPOINT ["bash", "/rhacs-api-docs-gen/rhacs-api-docs-gen.sh"]
