@@ -23,16 +23,4 @@ To generate the documentation:
    ```bash
     Please provide the version number of the RHACS release (e.g., 4.5.1): <version>
     ```
-4. The documentation gets generated in the `api` directory.
-5. Copy the output form the terminal and update the `_topic_map.yml` file:
-   ```yaml
-    - Name: API reference
-      Dir: api
-      Distros: openshift-acs
-      Topics:
-        - Name: AdministrationEventService
-          File: AdministrationEventService
-        - Name: AdministrationUsageService
-          File: AdministrationUsageService
-
-    ```
+4. `rhacs-api-docs-gen` generates the documentation in the `rest_api` directory and updates the `_topic_map.yml` file with the new API documentation.

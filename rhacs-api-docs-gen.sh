@@ -42,12 +42,12 @@ show_help() {
 /_/   \_|_|  |___| |____/ \___/ \____|____/   \____|_____|_| \_|
 
 EOF
-    echo -e "${NC}"
-    echo -e "${BLUE}Usage: bash rhacs-api-docs-gen.sh [command]${NC}"
-    echo -e "${YELLOW}Commands:${NC}"
-    echo -e "  generate  Download the OpenAPI spec and generate AsciiDoc files."
-    echo -e "  clean     Remove the 'api' directory."
-    echo -e "  help      Show this help message."
+    printf "${NC}"
+    printf "${BLUE}Usage: bash rhacs-api-docs-gen.sh [command]${NC}\n"
+    printf "${YELLOW}Commands:${NC}\n"
+    printf "  generate  Download the OpenAPI spec and generate AsciiDoc files.\n"
+    printf "  clean     Remove the 'rest_api' directory.\n"
+    printf "  help      Show this help message.\n"
 }
 
 # Function to prompt for version number
@@ -89,22 +89,21 @@ split_spec() {
 # Function to generate AsciiDoc files
 generate_asciidoc() {
     print_message $BLUE "📄 Generating AsciiDoc files..."
-    mkdir -p api
+    mkdir -p rest_api
 
     for spec_file in specs/*.json; do
         local base_name=$(basename "$spec_file" .json)
         print_message_disappearing $BLUE "🔧 Generating AsciiDoc for $base_name.json..."
 
-        # Generate AsciiDoc files in the api directory, suppressing output
+        # Generate AsciiDoc files in the rest_api directory, suppressing output
         bash /usr/local/bin/docker-entrypoint.sh generate \
             -i "$spec_file" \
             -g asciidoc \
-            -o "api/" > /dev/null 2>&1
+            -o "rest_api/" > /dev/null 2>&1
 
         # Rename the generated index.adoc to match the spec file name
-        if [ -f "api/index.adoc" ]; then
-            mv "api/index.adoc" "api/$base_name.adoc"
-            #print_message_disappearing $GREEN "✔ Generated AsciiDoc for $base_name.json."
+        if [ -f "rest_api/index.adoc" ]; then
+            mv "rest_api/index.adoc" "rest_api/$base_name.adoc"
         else
             print_message $RED "❌ index.adoc not found for $base_name.json."
         fi
@@ -117,8 +116,8 @@ generate_asciidoc() {
 # Function to update the AsciiDoc files
 update_asciidoc() {
     print_message $BLUE "🔧 Updating AsciiDoc files..."
-    # For all "*.adoc" files in the "api" directory run the updateasciidoc.js script
-    for adoc_file in api/*.adoc; do
+    # For all "*.adoc" files in the "rest_api" directory run the updateasciidoc.js script
+    for adoc_file in rest_api/*.adoc; do
         print_message_disappearing $BLUE "🔧 Updating AsciiDoc for $adoc_file..."
         node updateasciidoc.js $adoc_file
         #print_message_disappearing $GREEN "✔ Updated AsciiDoc for $adoc_file."
@@ -130,7 +129,7 @@ update_asciidoc() {
 # Function to remove generated spec files and artifacts
 remove_spec_files() {
     print_message $BLUE "🧹 Removing generated spec files..."
-    rm -rf specs swagger.json api/.openapi-generator-ignore api/.openapi-generator/
+    rm -rf specs swagger.json rest_api/.openapi-generator-ignore rest_api/.openapi-generator/
 
     if [[ $? -ne 0 ]]; then
         print_message $RED "❌ Failed to remove generated spec files and artifacts."
@@ -145,27 +144,32 @@ create_topic_map() {
     print_message $BLUE "🗂️ Creating topic map..."
 
     # Initialize the topic map content
-    local topic_map="Name: API reference\nDir: api\nDistros: openshift-acs\nTopics:\n"
+    local topic_map="Name: API reference\nDir: rest_api\nDistros: openshift-acs\nTopics:\n"
 
-    # Loop through all .adoc files in the api directory
-    for file in api/*.adoc; do
+    # Loop through all .adoc files in the rest_api directory
+    for file in rest_api/*.adoc; do
         # Get the filename without the extension
         local filename=$(basename "$file" .adoc)
         topic_map+="  - Name: $filename\n    File: $filename\n"
     done
 
-    # Print the topic map content
-    print_message $YELLOW "🚩 Please update the topic_map.yml file with the following content:\n\n"
-    print_message $NC "$topic_map"
+    # remove the existing rest_api dir if it exists
+    rm -rf /openshift-docs/rest_api
 
-    # copy the api dir to the /openshift-docs/api
-    cp -r api /openshift-docs/
+    # copy the rest_api dir to the /openshift-docs/rest_api
+    cp -r rest_api /openshift-docs/
+
+    # Update the topic_map.yml file
+    node updatetopicmap.js "$topic_map"
+
+    print_message $GREEN "✅ Generated topic map."
 }
 
 # Function to clean up generated files
 cleanup() {
     print_message $BLUE "🧹 Cleaning up generated files..."
-    rm -rf specs api swagger.json
+    rm -rf specs rest_api swagger.json
+    rm -rf /openshift-docs/rest_api
 
     if [[ $? -ne 0 ]]; then
         print_message $RED "❌ Failed to clean up generated files."
