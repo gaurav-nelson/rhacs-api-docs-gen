@@ -46,7 +46,17 @@ const updateAsciiDoc = (filePath) => {
         updatedLines.push("== Common object reference");
         updatedLines.push("");
         for (let j = i + 2; j < lines.length; j++) {
-          updatedLines.push(lines[j]);
+          // Convert unicode characters to ASCII before writing to file
+          const hexValues = lines[j].split(",");
+          const asciiChars = hexValues.map((c) => {
+            const codePoint = parseInt(c, 16);
+            // Check if the parsed value is a valid number
+            if (!isNaN(codePoint)) {
+              return String.fromCodePoint(codePoint); // Use fromCodePoint for full Unicode support
+            }
+            return ""; // Return an empty string for invalid hex values
+          });
+          updatedLines.push(asciiChars.join("")); // Join the characters back into a string
         }
         break;
       }
@@ -62,9 +72,7 @@ const updateAsciiDoc = (filePath) => {
       // Capitalize the first letter of lines starting with '[.'
       if (line.startsWith("[.")) {
         const updatedLine = line.slice(2, -1).trim(); // Remove '[.' and trim spaces, then remove last character
-        updatedLines.push(
-          `[id="${capitalizeFirstLetter(updatedLine)}"]`
-        ); // Format as [id="..."]
+        updatedLines.push(`[id="${capitalizeFirstLetter(updatedLine)}"]`); // Format as [id="..."]
         continue;
       }
 
