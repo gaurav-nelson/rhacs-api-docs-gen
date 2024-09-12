@@ -1,4 +1,3 @@
-# Use the OpenAPI Generator CLI as the base image
 FROM openapitools/openapi-generator-cli:v7.8.0
 
 # Install Node.js and other dependencies
@@ -8,7 +7,10 @@ RUN apt-get update && apt-get install -y nodejs
 WORKDIR /rhacs-api-docs-gen
 
 # Copy the current directory contents into the container at /rhacs-api-docs-gen
-COPY . /rhacs-api-docs-gen
+COPY ./scripts /rhacs-api-docs-gen
+
+# Copy the node_modules
+COPY ./node_modules /rhacs-api-docs-gen/node_modules
 
 # Make the script executable
 RUN chmod +x /rhacs-api-docs-gen/rhacs-api-docs-gen.sh

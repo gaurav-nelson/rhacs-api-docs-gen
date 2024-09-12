@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const entities = require("entities");
 
 // Function to capitalize the first letter of a string
 const capitalizeFirstLetter = (string) => {
@@ -46,17 +47,20 @@ const updateAsciiDoc = (filePath) => {
         updatedLines.push("== Common object reference");
         updatedLines.push("");
         for (let j = i + 2; j < lines.length; j++) {
-          // Convert unicode characters to ASCII before writing to file
-          const hexValues = lines[j].split(",");
-          const asciiChars = hexValues.map((c) => {
-            const codePoint = parseInt(c, 16);
-            // Check if the parsed value is a valid number
-            if (!isNaN(codePoint)) {
-              return String.fromCodePoint(codePoint); // Use fromCodePoint for full Unicode support
-            }
-            return ""; // Return an empty string for invalid hex values
-          });
-          updatedLines.push(asciiChars.join("")); // Join the characters back into a string
+          const decodedLine = entities.decodeHTML(lines[j]);
+
+          // Check if the current line is "JSON" and skip it
+          if (decodedLine.trim() === "JSON") {
+            continue; // Skip this line
+          }
+
+          // Check if the next line is "====" and change it to "==== JSON representation"
+          if (decodedLine.trim() === "====") {
+            updatedLines.push("==== JSON representation");
+            continue; // Skip adding the original "====" line
+          }
+
+          updatedLines.push(decodedLine);
         }
         break;
       }
