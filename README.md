@@ -27,3 +27,7 @@ To generate the documentation:
     Please provide the version number of the RHACS release (e.g., 4.5.1): <version>
     ```
 4. `rhacs-api-docs-gen` generates the documentation in the `rest_api` directory and updates the `_topic_map.yml` file with the new API documentation.
+
+## How it works
+
+![image](https://github.com/user-attachments/assets/5e0f5351-8f2d-4c2c-9bc5-3bec649ddeb8)
