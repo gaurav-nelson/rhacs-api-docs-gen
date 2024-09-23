@@ -16,25 +16,38 @@ const filePath = path.join('/', 'openshift-docs', '_topic_maps', '_topic_map.yml
 let content = fs.readFileSync(filePath, 'utf8');
 
 // Replace literal \n with actual newlines in topicMap
-topicMap = topicMap.replace(/\\n/g, '\n');
+if (topicMap) {
+    topicMap = topicMap.replace(/\\n/g, '\n');
+} else {
+    console.error('Error: topicMap is empty or undefined');
+    //exit with error
+    process.exit(1);
+}
 
 // Find the line number where `Name: API reference` starts
 const startLine = content.split('\n').findIndex(line => line.trim() === 'Name: API reference');
 
 if (startLine !== -1) {
     // Find the line number where `---` or end of file occurs after `Name: API reference`
-    const endLine = content.split('\n').slice(startLine + 1).findIndex(line => line.trim() === '---') + startLine + 1 || content.split('\n').length;
+    const linesAfterStart = content.split('\n').slice(startLine + 1);
+    const endLineAfterStart = linesAfterStart.findIndex(line => line.trim() === '---');
+    let endLine;
+    if (endLineAfterStart !== -1) {
+        endLine = startLine + 1 + endLineAfterStart + 1; // Include the '---' line
+    } else {
+        endLine = content.split('\n').length;
+    }
 
     // Delete lines from startLine to endLine
     const lines = content.split('\n');
-    const updatedContent = lines.slice(0, startLine).concat(lines.slice(endLine + 1)).join('\n');
+    const updatedContent = lines.slice(0, startLine).join('\n');
 
     // Insert topic_map at the position where lines were deleted
-    const finalContent = updatedContent.split('\n').slice(0, startLine).concat(topicMap.split('\n')).concat(updatedContent.split('\n').slice(startLine)).join('\n');
+    const finalContent = updatedContent + '\n' + topicMap;
 
     // Save the updated content back to the file
     fs.writeFileSync(filePath, finalContent, 'utf8');
 } else {
-    const finalContent = content + '\n---\n' + topicMap;
+    const finalContent = content + '---\n' + topicMap;
     fs.writeFileSync(filePath, finalContent, 'utf8');
 }

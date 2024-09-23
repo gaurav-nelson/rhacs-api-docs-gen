@@ -8,13 +8,18 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install the required Node.js packages
-RUN npm ci && npm cache clean --force
+RUN npm ci && \
+    npm cache clean --force && \
+    rm -rf /app/node_modules/.cache
 
 # Stage 2: Create the final image
 FROM openapitools/openapi-generator-cli:v7.8.0
 
 # Install Node.js and other dependencies
-RUN apt-get update && apt-get install -y nodejs
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
 WORKDIR /rhacs-api-docs-gen
