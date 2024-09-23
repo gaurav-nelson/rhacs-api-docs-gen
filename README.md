@@ -4,6 +4,9 @@ This is a simple tool to generate API documentation for RHACS. It uses the [Open
 
 ## Usage
 
+
+![image](https://github.com/user-attachments/assets/8cccd4ab-9c9d-4ba4-bfbb-c7a7b3004775)
+
 To generate the documentation:
 
 1. Open your `openshift-docs` repository and create a new branch:
