@@ -30,4 +30,5 @@ To generate the documentation:
 
 ## How it works
 
-![image](https://github.com/user-attachments/assets/5e0f5351-8f2d-4c2c-9bc5-3bec649ddeb8)
+![image](https://github.com/user-attachments/assets/9388c883-9527-4177-a4e8-2e82f5338562)
+
