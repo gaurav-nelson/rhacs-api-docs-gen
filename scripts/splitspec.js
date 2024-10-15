@@ -37,22 +37,51 @@ function splitOpenApiSpec(inputFilePath) {
     // Function to collect definitions from a schema reference
     function collectDefinitions(tag, schema, definitions) {
         if (schema.$ref) {
-            const refName = schema.$ref.split('/').pop(); // Get the last part after the last '/'
-            // Perform a case-insensitive search for the definition
-            const matchingDefinition = Object.keys(definitions).find(defName => defName.toLowerCase() === refName.toLowerCase());
-            if (matchingDefinition && !tagMap[tag].definitions[uppercaseFirstChar(matchingDefinition)]) {
-                // Add the definition with the first character uppercased
-                tagMap[tag].definitions[uppercaseFirstChar(matchingDefinition)] = definitions[matchingDefinition];
-                // Recursively collect definitions from the referenced definition
-                collectDefinitions(tag, definitions[matchingDefinition], definitions);
-            }
-        } else if (schema.type === 'object' && schema.properties) {
-            for (const prop of Object.values(schema.properties)) {
-                collectDefinitions(tag, prop, definitions);
-            }
-        } else if (schema.type === 'array' && schema.items) {
-            collectDefinitions(tag, schema.items, definitions);
-        }
+                        const refName = schema.$ref.split('/').pop(); // Get the last part after the last '/'
+                        // Perform a case-insensitive search for the definition
+                        const matchingDefinition = Object.keys(definitions).find(defName => defName.toLowerCase() === refName.toLowerCase());
+                        if (matchingDefinition && !tagMap[tag].definitions[uppercaseFirstChar(matchingDefinition)]) {
+                            // Add the definition with the first character uppercased
+                            tagMap[tag].definitions[uppercaseFirstChar(matchingDefinition)] = definitions[matchingDefinition];
+                            // Recursively collect definitions from the referenced definition
+                            collectDefinitions(tag, definitions[matchingDefinition], definitions);
+                        }
+                    } else if (schema.type === 'object' && schema.properties) {
+                        for (const [propName, prop] of Object.entries(schema.properties)) {
+                            collectDefinitions(tag, prop, definitions);
+                            // Handle error property
+                            if (propName === 'error' && prop.$ref) {
+                                const errorRefName = prop.$ref.split('/').pop();
+                                const matchingErrorDefinition = Object.keys(definitions).find(defName => defName.toLowerCase() === errorRefName.toLowerCase());
+                                if (matchingErrorDefinition && !tagMap[tag].definitions[uppercaseFirstChar(matchingErrorDefinition)]) {
+                                    tagMap[tag].definitions[uppercaseFirstChar(matchingErrorDefinition)] = definitions[matchingErrorDefinition];
+                                    collectDefinitions(tag, definitions[matchingErrorDefinition], definitions);
+                                }
+                            }
+                        }
+                    } else if (schema.type === 'array' && schema.items) {
+                        collectDefinitions(tag, schema.items, definitions);
+                    } else if (schema.allOf) {
+                        for (const subSchema of schema.allOf) {
+                            collectDefinitions(tag, subSchema, definitions);
+                        }
+                    } else if (schema.properties) {
+                        for (const prop of Object.values(schema.properties)) {
+                            collectDefinitions(tag, prop, definitions);
+                        }
+                    } else if (schema.items) {
+                        collectDefinitions(tag, schema.items, definitions);
+                    } else if (schema.oneOf) {
+                        for (const subSchema of schema.oneOf) {
+                            collectDefinitions(tag, subSchema, definitions);
+                        }
+                    } else if (schema.anyOf) {
+                        for (const subSchema of schema.anyOf) {
+                            collectDefinitions(tag, subSchema, definitions);
+                        }
+                    } else if (schema.additionalProperties) {
+                        collectDefinitions(tag, schema.additionalProperties, definitions);
+                    }
     }
 
     // Function to collect definitions from various parts of the OpenAPI spec
