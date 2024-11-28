@@ -33,21 +33,21 @@ if (startLine !== -1) {
     const endLineAfterStart = linesAfterStart.findIndex(line => line.trim() === '---');
     let endLine;
     if (endLineAfterStart !== -1) {
-        endLine = startLine + 1 + endLineAfterStart + 1; // Include the '---' line
+        endLine = startLine + 1 + endLineAfterStart; // Do not include the '---' line
     } else {
         endLine = content.split('\n').length;
     }
 
     // Delete lines from startLine to endLine
     const lines = content.split('\n');
-    const updatedContent = lines.slice(0, startLine).join('\n');
+    const updatedContent = lines.slice(0, startLine).concat(lines.slice(endLine)).join('\n');
 
     // Insert topic_map at the position where lines were deleted
-    const finalContent = updatedContent + '\n' + topicMap;
+    const finalContent = updatedContent + '\n' + topicMap + '\n';
 
     // Save the updated content back to the file
     fs.writeFileSync(filePath, finalContent, 'utf8');
 } else {
-    const finalContent = content + '---\n' + topicMap;
+    const finalContent = content + '\n' + topicMap + '\n';
     fs.writeFileSync(filePath, finalContent, 'utf8');
 }

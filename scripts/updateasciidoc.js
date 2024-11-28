@@ -131,6 +131,8 @@ const updateAsciiDoc = (filePath) => {
           updatedLines.push(decodedLine);
         }
         break;
+      } else if (line.startsWith("[#models]") && fileName !== "index.adoc") {
+        break;
       }
 
       // Add the auto-generated comment and content type at the beginning
@@ -143,11 +145,17 @@ const updateAsciiDoc = (filePath) => {
       }
 
       // Capitalize the first letter of lines starting with '[.'
-      if (line.startsWith("[.")) {
-        const updatedLine = line.slice(2, -1).trim(); // Remove '[.' and trim spaces, then remove last character
-        updatedLines.push(
-          `[id="${capitalizeFirstLetter(updatedLine)}_{context}"]`
-        );
+      if (line.startsWith("[.") && capturedTitle) {
+        let updatedLine = line.slice(2, -1).trim(); // Remove '[.' and trim spaces, then remove last character
+        updatedLine = `[id="${capitalizeFirstLetter(updatedLine)}_{context}"]`
+        //remove title from the line
+        const newLine = updatedLine.replace(documentTitle, "").trim();
+        if (newLine.length > 1) {
+          updatedLine = newLine;
+        }
+        updatedLines.push(updatedLine); // Add the updated line
+        continue;
+      } else if (line.startsWith("[.") && !capturedTitle) {
         continue;
       }
 
@@ -157,16 +165,17 @@ const updateAsciiDoc = (filePath) => {
           capturedTitle = true;
           //remove all spaces and `=` signs from the line
           documentTitle = line.replace(/[ =]/g, "");
+          continue; //skip the title line
         }
         const equalCount = line.match(/^=+/)[0].length; // Count leading '=' signs
-        if (equalCount > 2) {
+        if (equalCount > 3) {
           // Check if there are more than 2 '=' signs
-          // Remove 2 '=' signs and trim spaces
-          let updatedLine = line.slice(2).trim(); // Remove the first two '=' signs
+          // Remove 3 '=' signs and trim spaces
+          let updatedLine = line.slice(3).trim(); // Remove the first three '=' signs
 
           // Use regex to match the first word character after '== '
-          updatedLine = updatedLine.replace(/(?:==\s)(\w)/, (match, p1) => {
-            return `== ${p1.toUpperCase()}`; // Capitalize the first word character
+          updatedLine = updatedLine.replace(/(?:=\s)(\w)/, (match, p1) => {
+            return `= ${p1.toUpperCase()}`; // Capitalize the first word character
           });
 
           //Remove document title from the line
