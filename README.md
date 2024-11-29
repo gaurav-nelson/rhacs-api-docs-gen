@@ -28,6 +28,15 @@ To generate the documentation:
     ```
 4. `rhacs-api-docs-gen` generates the documentation in the `rest_api` directory and updates the `_topic_map.yml` file with the new API documentation.
 
+## Known Issues
+
+### `yamllint` error
+
+You must manually check and update the `_topic_map.yml` file with `yamllint` before committing the changes. The usual errors are:
+
+1. Missing `---` at the beginning of the **API reference** section.
+2. No newline at the end of the file.
+
 ## How it works
 
 ![image](https://github.com/user-attachments/assets/9388c883-9527-4177-a4e8-2e82f5338562)
