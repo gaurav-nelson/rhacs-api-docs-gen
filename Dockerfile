@@ -4,7 +4,7 @@ FROM node:22-slim AS build
 # Set the working directory
 WORKDIR /app
 
-# Copy the package.json and package-lock.json (if available)
+# Copy the package.json and package-lock.json
 COPY package*.json ./
 
 # Install the required Node.js packages
