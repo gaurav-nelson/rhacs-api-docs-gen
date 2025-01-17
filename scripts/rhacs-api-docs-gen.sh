@@ -60,44 +60,56 @@ prompt_for_version() {
     echo $version
 }
 
-# Function to download the OpenAPI specification
+# Function to download the OpenAPI specifications
 download_spec() {
-    local version=$1
-    local url="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/swagger.json"
-    local output_file="swagger.json"
+    # local version=$1
+    # local url_v1="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/v1.swagger.json"
+    # local url_v2="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/v2.swagger.json"
+    # local output_file_v1="v1.swagger.json"
+    # local output_file_v2="v2.swagger.json"
 
-    print_message $BLUE "📥 Downloading OpenAPI specification from $url..."
-    curl -o $output_file $url
+    # print_message $BLUE "📥 Downloading OpenAPI specification v1 from $url_v1..."
+    # curl -o $output_file_v1 $url_v1
 
-    if [[ $? -ne 0 ]]; then
-        print_message $RED "❌ Failed to download the OpenAPI specification."
-        exit 1
-    fi
+    # if [[ $? -ne 0 ]]; then
+    #     print_message $RED "❌ Failed to download the OpenAPI specification v1."
+    #     exit 1
+    # fi
 
-    print_message $GREEN "✅ Downloaded OpenAPI specification."
+    # print_message $GREEN "✅ Downloaded OpenAPI specification v1."
+
+    # print_message $BLUE "📥 Downloading OpenAPI specification v2 from $url_v2..."
+    # curl -o $output_file_v2 $url_v2
+
+    # if [[ $? -ne 0 ]]; then
+    #     print_message $RED "❌ Failed to download the OpenAPI specification v2."
+    #     exit 1
+    # fi
+
+    print_message $GREEN "✅ Downloaded OpenAPI specification v2."
 }
 
 # Function to split the OpenAPI specification
 split_spec() {
     local input_file=$1
-    print_message $BLUE "✂️ Splitting OpenAPI specification..."
+    print_message $BLUE "✂️ Splitting OpenAPI specification $input_file..."
     node splitspecwithoutdefinitions.js $input_file
 
     if [[ $? -ne 0 ]]; then
-        print_message $RED "❌ Failed to split the OpenAPI specification."
+        print_message $RED "❌ Failed to split the OpenAPI specification $input_file."
         exit 1
     fi
-    #print_message $GREEN "✅ Split OpenAPI specification."
 }
 
 # Function to generate AsciiDoc files
 generate_asciidoc() {
-    print_message $BLUE "📄 Generating AsciiDoc files..."
-    mkdir -p rest_api
+    local version=$1
+    print_message $BLUE "📄 Generating AsciiDoc files for $version..."
+    mkdir -p "rest_api/$version"
 
     for tag_dir in specs/*/; do
         local tag_name=$(basename "$tag_dir")
-        local output_tag_dir="rest_api/$tag_name"
+        local output_tag_dir="rest_api/$version/$tag_name"
         mkdir -p "$output_tag_dir"
 
         for spec_file in "$tag_dir"/*.json; do
@@ -120,27 +132,27 @@ generate_asciidoc() {
         done
     done
 
-    print_message $GREEN "\n✅ Generated AsciiDoc files."
+    print_message $GREEN "\n✅ Generated AsciiDoc files for $version."
 }
 
 # Function to update the AsciiDoc files
 update_asciidoc() {
-    print_message $BLUE "🔧 Updating AsciiDoc files..."
-    # Recursively find all "*.adoc" files in the "api" directory and run the updateasciidoc.js script
-    find rest_api -type f -name "*.adoc" | while read -r adoc_file; do
+    local version=$1
+    print_message $BLUE "🔧 Updating AsciiDoc files for $version..."
+    # Recursively find all "*.adoc" files in the "rest_api/$version" directory and run the updateasciidoc.js script
+    find "rest_api/$version" -type f -name "*.adoc" | while read -r adoc_file; do
         print_message_disappearing $BLUE "🔧 Updating AsciiDoc for $adoc_file..."
         node updateasciidoc.js "$adoc_file"
-        #print_message_disappearing $GREEN "✔ Updated AsciiDoc for $adoc_file."
     done
 
-    print_message $GREEN "\n✅ Updated AsciiDoc files."
+    print_message $GREEN "\n✅ Updated AsciiDoc files for $version."
 }
 
 # Function to remove specific generated spec files and artifacts
 remove_spec_files() {
     print_message $BLUE "🧹 Removing generated spec files..."
-    rm -rf specs swagger.json
-    # Recursively find and delete .openapi-generator-ignore and .openapi-generator files from all folders inside the api directory
+    rm -rf specs v1.swagger.json v2.swagger.json
+    # Recursively find and delete .openapi-generator-ignore and .openapi-generator files from all folders inside the rest_api directory
     find rest_api -type f -name ".openapi-generator-ignore" -exec rm -f {} +
     find rest_api -type d -name ".openapi-generator" -exec rm -rf {} +
 
@@ -161,8 +173,8 @@ create_topic_map() {
     local OUTPUT_FILE="api_reference.yml"
 
     # Start the YAML structure
-    each "---" > "$OUTPUT_FILE"
-    echo "Name: API reference" > "$OUTPUT_FILE"
+    echo "---" > "$OUTPUT_FILE"
+    echo "Name: API reference" >> "$OUTPUT_FILE"
     echo "Dir: $ROOT_DIR" >> "$OUTPUT_FILE"
     echo "Distros: openshift-acs" >> "$OUTPUT_FILE"
     echo "Topics:" >> "$OUTPUT_FILE"
@@ -188,10 +200,17 @@ create_topic_map() {
         done
     }
 
-    # Process each service directory
-    for service in "$ROOT_DIR"/*/; do
-        service_name=$(basename "$service")
-        process_service "$service" "$service_name"
+    # Process each version directory
+    for version in "v1" "v2"; do
+        echo "- Name: Version $version" >> "$OUTPUT_FILE"
+        echo "  Dir: $version" >> "$OUTPUT_FILE"
+        echo "  Topics:" >> "$OUTPUT_FILE"
+
+        # Process each service directory within the version directory
+        for service in "$ROOT_DIR/$version"/*/; do
+            service_name=$(basename "$service")
+            process_service "$service" "$service_name"
+        done
     done
 
     # remove the existing rest_api dir if it exists
@@ -212,7 +231,7 @@ create_topic_map() {
 # Function to clean up generated files
 cleanup() {
     print_message $BLUE "🧹 Cleaning up generated files..."
-    rm -rf specs rest_api swagger.json
+    rm -rf specs rest_api v1.swagger.json v2.swagger.json
     rm -rf /openshift-docs/rest_api
 
     if [[ $? -ne 0 ]]; then
@@ -229,9 +248,12 @@ generate)
     print_banner
     version=$(prompt_for_version)
     download_spec $version
-    split_spec "swagger.json"
-    generate_asciidoc
-    update_asciidoc
+    split_spec "v1.swagger.json"
+    generate_asciidoc "v1"
+    update_asciidoc "v1"
+    split_spec "v2.swagger.json"
+    generate_asciidoc "v2"
+    update_asciidoc "v2"
     remove_spec_files
     create_topic_map
     print_message $GREEN "🎉 All tasks completed successfully!"
