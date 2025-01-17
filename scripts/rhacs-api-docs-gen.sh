@@ -62,29 +62,29 @@ prompt_for_version() {
 
 # Function to download the OpenAPI specifications
 download_spec() {
-    # local version=$1
-    # local url_v1="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/v1.swagger.json"
-    # local url_v2="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/v2.swagger.json"
-    # local output_file_v1="v1.swagger.json"
-    # local output_file_v2="v2.swagger.json"
+    local version=$1
+    local url_v1="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/v1.swagger.json"
+    local url_v2="https://mirror.openshift.com/pub/rhacs/openapi-spec/${version}/v2.swagger.json"
+    local output_file_v1="v1.swagger.json"
+    local output_file_v2="v2.swagger.json"
 
-    # print_message $BLUE "📥 Downloading OpenAPI specification v1 from $url_v1..."
-    # curl -o $output_file_v1 $url_v1
+    print_message $BLUE "📥 Downloading OpenAPI specification v1 from $url_v1..."
+    curl -o $output_file_v1 $url_v1
 
-    # if [[ $? -ne 0 ]]; then
-    #     print_message $RED "❌ Failed to download the OpenAPI specification v1."
-    #     exit 1
-    # fi
+    if [[ $? -ne 0 ]]; then
+        print_message $RED "❌ Failed to download the OpenAPI specification v1."
+        exit 1
+    fi
 
-    # print_message $GREEN "✅ Downloaded OpenAPI specification v1."
+    print_message $GREEN "✅ Downloaded OpenAPI specification v1."
 
-    # print_message $BLUE "📥 Downloading OpenAPI specification v2 from $url_v2..."
-    # curl -o $output_file_v2 $url_v2
+    print_message $BLUE "📥 Downloading OpenAPI specification v2 from $url_v2..."
+    curl -o $output_file_v2 $url_v2
 
-    # if [[ $? -ne 0 ]]; then
-    #     print_message $RED "❌ Failed to download the OpenAPI specification v2."
-    #     exit 1
-    # fi
+    if [[ $? -ne 0 ]]; then
+        print_message $RED "❌ Failed to download the OpenAPI specification v2."
+        exit 1
+    fi
 
     print_message $GREEN "✅ Downloaded OpenAPI specification v2."
 }
@@ -122,7 +122,7 @@ generate_asciidoc() {
             fi
 
             local output_file="$output_tag_dir/${base_name//[\{\}]/}.adoc"
-            print_message $BLUE "🔧 Generating AsciiDoc for $base_name.json..."
+            print_message_disappearing $BLUE "🔧 Generating AsciiDoc for $base_name.json..."
 
             # Generate AsciiDoc files in the output directory, suppressing output
             bash /usr/local/bin/docker-entrypoint.sh generate \
@@ -141,7 +141,7 @@ generate_asciidoc() {
         # Remove empty directories
         if [ -z "$(ls -A "$output_tag_dir")" ]; then
             rmdir "$output_tag_dir"
-            print_message $YELLOW "🗑️ Removed empty directory $output_tag_dir."
+            print_message_disappearing $YELLOW "🗑️ Removed empty directory $output_tag_dir."
         fi
     done
 
@@ -197,9 +197,9 @@ create_topic_map() {
         local service_dir="$1"
         local service_name="$2"
 
-        echo "- Name: $service_name" >> "$OUTPUT_FILE"
-        echo "  Dir: $service_name" >> "$OUTPUT_FILE"
-        echo "  Topics:" >> "$OUTPUT_FILE"
+        echo "  - Name: $service_name" >> "$OUTPUT_FILE"
+        echo "    Dir: $service_name" >> "$OUTPUT_FILE"
+        echo "    Topics:" >> "$OUTPUT_FILE"
 
         # Process each .adoc file in the service directory
         for file in "$service_dir"/*.adoc; do
@@ -207,8 +207,8 @@ create_topic_map() {
                 # Extract the name from the file
                 name=$(grep -m 1 '^=' "$file" | sed 's/^= //')
                 file_name=$(basename "$file" .adoc) # Remove the .adoc extension
-                echo "  - Name: $name" >> "$OUTPUT_FILE"
-                echo "    File: $file_name" >> "$OUTPUT_FILE"
+                echo "    - Name: $name" >> "$OUTPUT_FILE"
+                echo "      File: $file_name" >> "$OUTPUT_FILE"
             fi
         done
     }
@@ -241,6 +241,17 @@ create_topic_map() {
     print_message $GREEN "✅ Generated topic map."
 }
 
+# Function to update specific tags in AsciiDoc files
+update_adoc_tags() {
+    print_message $BLUE "🔧 Fixing Refs for Pantheon..."
+    find rest_api -type f -name "*.adoc" | while read -r adoc_file; do
+        sed -i '' 's/Next_available_tag__/NextAvailableTag/g' "$adoc_file"
+        sed -i '' 's/Next_tag__/NextTag/g' "$adoc_file"
+        print_message_disappearing $BLUE "🔧 Updated tags in $adoc_file..."
+    done
+    print_message $GREEN "\n✅ Updated tags in AsciiDoc files."
+}
+
 # Function to clean up generated files
 cleanup() {
     print_message $BLUE "🧹 Cleaning up generated files..."
@@ -269,6 +280,7 @@ generate)
     update_asciidoc "v2"
     remove_spec_files
     create_topic_map
+    update_adoc_tags
     print_message $GREEN "🎉 All tasks completed successfully!"
     ;;
 clean)
