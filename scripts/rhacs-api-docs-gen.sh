@@ -114,8 +114,15 @@ generate_asciidoc() {
 
         for spec_file in "$tag_dir"/*.json; do
             local base_name=$(basename "$spec_file" .json)
+
+            # Skip files starting with _v1 for v2
+            if [[ "$version" == "v2" && "$base_name" == _v1* ]]; then
+                print_message_disappearing $YELLOW "⚠️ Skipping $base_name.json for $version..."
+                continue
+            fi
+
             local output_file="$output_tag_dir/${base_name//[\{\}]/}.adoc"
-            print_message_disappearing $BLUE "🔧 Generating AsciiDoc for $base_name.json..."
+            print_message $BLUE "🔧 Generating AsciiDoc for $base_name.json..."
 
             # Generate AsciiDoc files in the output directory, suppressing output
             bash /usr/local/bin/docker-entrypoint.sh generate \
@@ -130,6 +137,12 @@ generate_asciidoc() {
                 print_message $RED "❌ index.adoc not found for $base_name.json."
             fi
         done
+
+        # Remove empty directories
+        if [ -z "$(ls -A "$output_tag_dir")" ]; then
+            rmdir "$output_tag_dir"
+            print_message $YELLOW "🗑️ Removed empty directory $output_tag_dir."
+        fi
     done
 
     print_message $GREEN "\n✅ Generated AsciiDoc files for $version."
