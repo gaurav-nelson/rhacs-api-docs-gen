@@ -266,6 +266,8 @@ cleanup() {
     printf "✅ ${GREEN}Cleaned up generated files.${NC}\n"
 }
 
+trap 'print_message $RED "❌ Script interrupted, Exitting..."; exit 1' SIGINT SIGTERM
+
 # Main script execution based on command
 case "$1" in
 generate)
