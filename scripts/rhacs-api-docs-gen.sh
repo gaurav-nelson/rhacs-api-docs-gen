@@ -241,17 +241,6 @@ create_topic_map() {
     print_message $GREEN "✅ Generated topic map."
 }
 
-# Function to update specific tags in AsciiDoc files
-update_adoc_tags() {
-    print_message $BLUE "🔧 Fixing Refs for Pantheon..."
-    find rest_api -type f -name "*.adoc" | while read -r adoc_file; do
-        sed -i '' 's/Next_available_tag__/NextAvailableTag/g' "$adoc_file"
-        sed -i '' 's/Next_tag__/NextTag/g' "$adoc_file"
-        print_message_disappearing $BLUE "🔧 Updated tags in $adoc_file..."
-    done
-    print_message $GREEN "\n✅ Updated tags in AsciiDoc files."
-}
-
 # Function to clean up generated files
 cleanup() {
     print_message $BLUE "🧹 Cleaning up generated files..."
@@ -282,7 +271,6 @@ generate)
     update_asciidoc "v2"
     remove_spec_files
     create_topic_map
-    update_adoc_tags
     print_message $GREEN "🎉 All tasks completed successfully!"
     ;;
 clean)
