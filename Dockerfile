@@ -13,7 +13,7 @@ RUN npm ci && \
     rm -rf /app/node_modules/.cache
 
 # Stage 2: Create the final image
-FROM openapitools/openapi-generator-cli:v7.8.0
+FROM openapitools/openapi-generator-cli:v7.12.0
 
 # Install Node.js and other dependencies
 RUN apt-get update && \

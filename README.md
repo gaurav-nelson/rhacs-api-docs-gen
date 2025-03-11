@@ -30,14 +30,46 @@ To generate the documentation:
 
 ## Known Issues
 
-### `yamllint` error
+### 1. `yamllint` error
 
 You must manually check and update the `_topic_map.yml` file with `yamllint` before committing the changes. The usual errors are:
 
-1. Missing `---` at the beginning of the **API reference** section.
+1. Missing or additional `---` at the beginning of the **API reference** section.
 2. No newline at the end of the file.
 
-### Unknown ID or title used as an internal cross reference
+### 2. Unescaped '<' not allowed in attributes values
+The error might be something like `Unescaped '<' not allowed in attributes values, line 70412, column 76 (master.xml, line 70412)`.
+
+To debug this type of error, inspect the generated `master.xml` file at `drupal-build/openshift-acs/rest_api/build/master.xml`.
+
+1. Read the specific line.
+    ```
+    sed '70412!d' drupal-build/openshift-acs/rest_api/build/master.xml
+   <entry align="left" valign="top"><simpara><link linkend="Next_available_tag<emphasis>10__v1_externalbackups_externalBackup.id_patch">Next_available_tag</emphasis>10</link></simpara></entry>
+    ```
+2. The existence of `Next_available_tag<emphasis>10` is causing this issue. Search for `Next_available_tag__10` in your editor (VS Code) for the matching entry.
+3. Fix it by removing all underscores and capitalizing the first character. In this case, change the matching line `| <<Next_available_tag__10_{context}, Next_available_tag__10>>` to `| <<NextAvailableTag10_{context}, NextAvailableTag10>>`.
+4. You can also copy the script below and run it locally to fix the these types of tags.
+   ```sh
+   #!/bin/bash
+   DIRECTORY="rest_api"
+   if [ ! -d "$DIRECTORY" ]; then
+     echo "Directory $DIRECTORY does not exist."
+     exit 1
+   fi
+   find "$DIRECTORY" -type f -name "*.adoc" -exec sed -i.bak -E 's/Next_available_tag__([0-9]+)/NextAvailableTag\1/g; s/Next_Tag__([0-9]+)/NextTag\1/g' {} +
+   find "$DIRECTORY" -type f -name "*.adoc" | while read -r file; do
+     if [ -f "$file.bak" ]; then
+       CHANGES=$(diff -u "$file.bak" "$file" | grep -E '^\+' | grep -vE '^\+\+\+' | wc -l)
+       if [ "$CHANGES" -gt 0 ]; then
+         echo "Fixed incorrect tags in: $file, Change count: $CHANGES"
+       fi
+       rm "$file.bak"
+     fi
+   done
+   ```
+
+### 3. Unknown ID or title used as an internal cross reference
 
 You must run the Prow smoke test script and check for Pantheon build errors.
 
