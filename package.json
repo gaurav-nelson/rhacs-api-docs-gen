@@ -1,6 +1,6 @@
 {
   "name": "rhacs-api-docs-gen",
-  "version": "1.0.9",
+  "version": "1.0.11",
   "description": "Generate AsciiDoc API documentation for RHACS.",
   "main": "index.js",
   "scripts": {
