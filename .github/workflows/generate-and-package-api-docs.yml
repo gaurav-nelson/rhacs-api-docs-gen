@@ -1,0 +1,43 @@
+name: Generate and Package API Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'RHACS Version (e.g., 4.6.0)'
+        required: true
+        type: string
+
+jobs:
+  generate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          tags: rhacs-api-docs-gen:local
+          load: true
+          push: false
+
+      - name: Generate and package documentation
+        run: |
+          mkdir -p output
+          docker run --rm \
+            -v ${{ github.workspace }}/output:/output \
+            -e VERSION=${{ inputs.version }} \
+            rhacs-api-docs-gen:local \
+            bash /rhacs-api-docs-gen/generate-and-package-docs.sh
+
+      - name: Upload packaged documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.version }}_api_docs
+          path: output/${{ inputs.version }}_api_docs.zip
+          retention-days: 7

@@ -17,7 +17,7 @@ FROM openapitools/openapi-generator-cli:v7.12.0
 
 # Install Node.js and other dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends nodejs && \
+    apt-get install -y --no-install-recommends nodejs git zip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -30,8 +30,10 @@ COPY ./scripts /rhacs-api-docs-gen
 # Copy the Node.js dependencies from the previous stage
 COPY --from=build /app/node_modules /rhacs-api-docs-gen/node_modules
 
-# Make the script executable
-RUN chmod +x /rhacs-api-docs-gen/rhacs-api-docs-gen.sh
+# Make the scripts executable
+RUN chmod +x /rhacs-api-docs-gen/rhacs-api-docs-gen.sh && \
+    chmod +x /rhacs-api-docs-gen/generate-and-package-docs.sh && \
+    chmod +x /rhacs-api-docs-gen/fix_tags.sh
 
 # Entrypoint
 ENTRYPOINT ["bash", "/rhacs-api-docs-gen/rhacs-api-docs-gen.sh"]
