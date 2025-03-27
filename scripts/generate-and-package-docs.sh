@@ -36,6 +36,13 @@ print_banner() {
  / ___ \|  __/| |  | |_| | |_| | |___ ___) | | |_| | |___| |\  |
 /_/   \_|_|  |___| |____/ \___/ \____|____/   \____|_____|_| \_|
 
+                            _   _
+                  /\       | | (_)
+                 /  \   ___| |_ _  ___  _ __
+                / /\ \ / __| __| |/ _ \| '_ \
+               / ____ \ (__| |_| | (_) | | | |
+              /_/    \_\___|\__|_|\___/|_| |_|
+
 EOF
 }
 
@@ -83,6 +90,11 @@ process_api_version() {
     local current=0
     local progress_step=$((total_spec_files / 10 > 0 ? total_spec_files / 10 : 1))
 
+    # Using a semaphore approach for limited parallelism in generation
+    local max_parallel=8
+    local running=0
+    local pids=()
+
     # Process each tag directory
     for tag_dir in specs/*/; do
         tag_name=$(basename "$tag_dir")
@@ -107,21 +119,37 @@ process_api_version() {
 
             output_file="$output_tag_dir/${base_name//[\{\}]/}.adoc"
 
-            # Generate AsciiDoc files
-            bash /usr/local/bin/docker-entrypoint.sh generate \
-                -i "$spec_file" \
-                -g asciidoc \
-                -o "$output_tag_dir" >/dev/null 2>&1
-
-            # Rename the generated index.adoc to match the spec file name
-            if [ -f "$output_tag_dir/index.adoc" ]; then
-                mv "$output_tag_dir/index.adoc" "$output_file"
+            # Wait if we've reached max parallel processes
+            if [[ $running -ge $max_parallel ]]; then
+                # Wait for any child process to finish
+                wait -n
+                running=$((running - 1))
             fi
-        done
 
-        # Remove empty directories
-        if [ -z "$(ls -A "$output_tag_dir")" ]; then
-            rmdir "$output_tag_dir"
+            # Generate AsciiDoc files in the background
+            {
+                bash /usr/local/bin/docker-entrypoint.sh generate \
+                    -i "$spec_file" \
+                    -g asciidoc \
+                    -o "$output_tag_dir" >/dev/null 2>&1
+
+                # Rename the generated index.adoc to match the spec file name
+                if [ -f "$output_tag_dir/index.adoc" ]; then
+                    mv "$output_tag_dir/index.adoc" "$output_file"
+                fi
+            } &
+            pids+=($!)
+            running=$((running + 1))
+        done
+    done
+
+    # Wait for all remaining processes
+    wait
+
+    # Remove empty directories
+    for tag_dir in "$ROOT_DIR/$version"/*/; do
+        if [ -z "$(ls -A "$tag_dir")" ]; then
+            rmdir "$tag_dir"
         fi
     done
 
@@ -137,8 +165,7 @@ update_asciidoc_files() {
     local current=0
     local progress_step=$((total_files / 10 > 0 ? total_files / 10 : 1))
 
-    # Using a semaphore approach for limited parallelism
-    local max_parallel=8  # Increased from 4 to 8 for GitHub runner with 4 cores/16GB RAM
+    local max_parallel=8
     local running=0
     local pids=()
 
@@ -250,10 +277,26 @@ download_openapi_spec "v1" &
 download_openapi_spec "v2" &
 wait
 
-# Process API versions with different skip patterns
-process_api_version "v1" "_v2"
-rm -rf specs  # Clean up before processing v2
-process_api_version "v2" "_v1"
+# Process both API versions in parallel
+print_message $BLUE "🔄 Processing API versions in parallel..."
+process_api_version "v1" "_v2" &
+v1_pid=$!
+process_api_version "v2" "_v1" &
+v2_pid=$!
+
+# Wait for both processes to complete
+wait $v1_pid
+wait $v2_pid
+
+# Clean up specs directories
+rm -rf specs
+
+# Remove OpenAPI generator artifacts
+print_message $BLUE "🧹 Removing OpenAPI generator artifacts..."
+# Use -depth to process directory contents before the directory itself
+find "$ROOT_DIR" -depth -type d -name ".openapi-generator" -exec rm -rf {} \; 2>/dev/null || true
+find "$ROOT_DIR" -type f -name ".openapi-generator-ignore" -exec rm -f {} \; 2>/dev/null || true
+print_message $GREEN "✅ Removed OpenAPI generator artifacts."
 
 # Fix tags using the fix_tags.sh script
 print_message $BLUE "🔧 Fixing tags in AsciiDoc files..."
