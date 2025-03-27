@@ -130,10 +130,22 @@ done
 
 # Update AsciiDoc files for V1
 print_message $BLUE "🔧 Updating AsciiDoc files for V1..."
+total_files=$(find "rest_api/v1" -type f -name "*.adoc" | wc -l)
+current=0
+progress_step=$((total_files / 10 > 0 ? total_files / 10 : 1))  # Show progress every ~10% or at least every file
+
 find "rest_api/v1" -type f -name "*.adoc" | while read -r adoc_file; do
+    current=$((current + 1))
+
+    # Show progress at intervals
+    if [[ $((current % progress_step)) -eq 0 ]] || [[ $current -eq $total_files ]]; then
+        percentage=$((current * 100 / total_files))
+        print_message $CYAN "  Progress: $current/$total_files files ($percentage%)"
+    fi
+
     node updateasciidoc.js "$adoc_file" > /dev/null 2>&1 || print_message $RED "❌ Error updating $adoc_file"
 done
-print_message $GREEN "✅ Processed V1 specification."
+print_message $GREEN "✅ Processed $total_files V1 AsciiDoc files."
 
 # 4. Process V2 spec
 print_message $BLUE "🔄 Processing V2 specification..."
@@ -179,10 +191,22 @@ done
 
 # Update AsciiDoc files for V2
 print_message $BLUE "🔧 Updating AsciiDoc files for V2..."
+total_files=$(find "rest_api/v2" -type f -name "*.adoc" | wc -l)
+current=0
+progress_step=$((total_files / 10 > 0 ? total_files / 10 : 1))  # Show progress every ~10% or at least every file
+
 find "rest_api/v2" -type f -name "*.adoc" | while read -r adoc_file; do
+    current=$((current + 1))
+
+    # Show progress at intervals
+    if [[ $((current % progress_step)) -eq 0 ]] || [[ $current -eq $total_files ]]; then
+        percentage=$((current * 100 / total_files))
+        print_message $CYAN "  Progress: $current/$total_files files ($percentage%)"
+    fi
+
     node updateasciidoc.js "$adoc_file" > /dev/null 2>&1 || print_message $RED "❌ Error updating $adoc_file"
 done
-print_message $GREEN "✅ Processed V2 specification."
+print_message $GREEN "✅ Processed $total_files V2 AsciiDoc files."
 
 # 5. Fix tags using the fix_tags.sh script
 print_message $BLUE "🔧 Fixing tags in AsciiDoc files..."
