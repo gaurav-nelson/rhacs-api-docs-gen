@@ -72,11 +72,17 @@ process_api_version() {
     node splitspecwithoutdefinitions.js ${version}.swagger.json 2>&1 | grep -i "error" || true
 
     # Generate AsciiDoc files
-    print_message $BLUE "📄 Generating AsciiDoc files for $version..."
+    print_message $BLUE "📄 Generating AsciiDoc files for $version with parallel processing (8 workers)..."
     mkdir -p "$ROOT_DIR/$version"
 
-    # Count total spec files for progress reporting
+    # Count total spec files for progress reporting - ensure they exist first
     local total_spec_files=0
+    if ! ls specs/*/*.json >/dev/null 2>&1; then
+        print_message $RED "❌ No spec files found to process. Splitting may have failed."
+        exit 1
+    fi
+
+    # Get an accurate count of files to process
     for tag_dir in specs/*/; do
         for spec_file in "$tag_dir"/*.json; do
             base_name=$(basename "$spec_file" .json)
@@ -94,6 +100,7 @@ process_api_version() {
     local max_parallel=8
     local running=0
     local pids=()
+    local failed_files=0
 
     # Process each tag directory
     for tag_dir in specs/*/; do
@@ -126,16 +133,31 @@ process_api_version() {
                 running=$((running - 1))
             fi
 
-            # Generate AsciiDoc files in the background
+            # Generate AsciiDoc files in the background with proper error capture
             {
+                # Run the OpenAPI generator
                 bash /usr/local/bin/docker-entrypoint.sh generate \
                     -i "$spec_file" \
                     -g asciidoc \
                     -o "$output_tag_dir" >/dev/null 2>&1
 
-                # Rename the generated index.adoc to match the spec file name
-                if [ -f "$output_tag_dir/index.adoc" ]; then
-                    mv "$output_tag_dir/index.adoc" "$output_file"
+                gen_result=$?
+
+                # Only attempt to rename if generation succeeded
+                if [[ $gen_result -eq 0 ]]; then
+                    # Rename the generated index.adoc to match the spec file name if it exists
+                    if [ -f "$output_tag_dir/index.adoc" ]; then
+                        mv "$output_tag_dir/index.adoc" "$output_file"
+                    else
+                        # Record the failure but don't show an error message during processing
+                        # as this would clutter the output during parallel execution
+                        failed_files=$((failed_files + 1))
+                        echo "Failed to generate file for: $spec_file" >> /tmp/generation_errors.log
+                    fi
+                else
+                    # Record generation failures
+                    failed_files=$((failed_files + 1))
+                    echo "Generation failed for: $spec_file" >> /tmp/generation_errors.log
                 fi
             } &
             pids+=($!)
@@ -146,12 +168,29 @@ process_api_version() {
     # Wait for all remaining processes
     wait
 
+    # Check for and report errors after all processes complete
+    if [[ $failed_files -gt 0 ]]; then
+        print_message $YELLOW "⚠️ $failed_files file(s) could not be generated properly."
+        if [[ -f /tmp/generation_errors.log ]]; then
+            print_message $YELLOW "See detailed errors in log:"
+            cat /tmp/generation_errors.log | head -10 # Show first 10 errors
+            if [[ $(cat /tmp/generation_errors.log | wc -l) -gt 10 ]]; then
+                print_message $YELLOW "...and more. Total error count: $(cat /tmp.generation_errors.log | wc -l)"
+            fi
+            rm /tmp/generation_errors.log
+        fi
+    fi
+
     # Remove empty directories
     for tag_dir in "$ROOT_DIR/$version"/*/; do
-        if [ -z "$(ls -A "$tag_dir")" ]; then
+        if [ -d "$tag_dir" ] && [ -z "$(ls -A "$tag_dir" 2>/dev/null)" ]; then
             rmdir "$tag_dir"
         fi
     done
+
+    # Re-count the actual generated files to make sure the counts are accurate
+    local generated_files=$(find "$ROOT_DIR/$version" -type f -name "*.adoc" | wc -l)
+    print_message $GREEN "✅ Successfully generated $generated_files AsciiDoc files for $version"
 
     # Update AsciiDoc files to fix links and formatting
     update_asciidoc_files "$version"
@@ -160,10 +199,18 @@ process_api_version() {
 # Update AsciiDoc files for proper linking and formatting
 update_asciidoc_files() {
     local version=$1
-    print_message $BLUE "🔧 Updating AsciiDoc files for $version..."
+    print_message $BLUE "🔧 Updating AsciiDoc files for $version with parallel processing (8 workers)..."
+
+    # Check if there are any files to process
+    if ! find "$ROOT_DIR/$version" -type f -name "*.adoc" | grep -q .; then
+        print_message $RED "❌ No AsciiDoc files found to update for $version."
+        return 1
+    fi
+
     local total_files=$(find "$ROOT_DIR/$version" -type f -name "*.adoc" | wc -l)
     local current=0
     local progress_step=$((total_files / 10 > 0 ? total_files / 10 : 1))
+    local failed_updates=0
 
     local max_parallel=8
     local running=0
@@ -185,9 +232,13 @@ update_asciidoc_files() {
             running=$((running - 1))
         fi
 
-        # Process file in the background
+        # Process file in the background with proper error handling
         {
-            node updateasciidoc.js "$adoc_file" > /dev/null 2>&1 || print_message $RED "❌ Error updating $adoc_file"
+            node updateasciidoc.js "$adoc_file" > /dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+                echo "Failed to update: $adoc_file" >> /tmp/update_errors.log
+                failed_updates=$((failed_updates + 1))
+            fi
         } &
         pids+=($!)
         running=$((running + 1))
@@ -195,7 +246,23 @@ update_asciidoc_files() {
 
     # Wait for all remaining processes
     wait
-    print_message $GREEN "✅ Processed $total_files $version AsciiDoc files."
+
+    # Check for and report errors after all processes complete
+    if [[ $failed_updates -gt 0 ]]; then
+        print_message $YELLOW "⚠️ $failed_updates file(s) could not be updated properly."
+        if [[ -f /tmp/update_errors.log ]]; then
+            print_message $YELLOW "See detailed errors in log:"
+            cat /tmp/update_errors.log | head -10 # Show first 10 errors
+            if [[ $(cat /tmp/update_errors.log | wc -l) -gt 10 ]]; then
+                print_message $YELLOW "...and more. Total error count: $(cat /tmp/update_errors.log | wc -l)"
+            fi
+            rm /tmp/update_errors.log
+        fi
+    fi
+
+    # Re-count the actual updated files to ensure accuracy
+    local actual_files=$(find "$ROOT_DIR/$version" -type f -name "*.adoc" | wc -l)
+    print_message $GREEN "✅ Processed $actual_files $version AsciiDoc files."
 }
 
 # Create topic map from generated files
