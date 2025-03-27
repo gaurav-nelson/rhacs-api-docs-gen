@@ -32,8 +32,9 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}/output:/output \
             -e VERSION=${{ inputs.version }} \
+            --entrypoint bash \
             rhacs-api-docs-gen:local \
-            bash /rhacs-api-docs-gen/generate-and-package-docs.sh
+            /rhacs-api-docs-gen/generate-and-package-docs.sh
 
       - name: Upload packaged documentation
         uses: actions/upload-artifact@v4

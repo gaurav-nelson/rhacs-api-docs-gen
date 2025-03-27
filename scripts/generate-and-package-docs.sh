@@ -89,7 +89,7 @@ print_message $GREEN "✅ Cloned openshift-docs repository with branch $BRANCH_N
 # 3. Process V1 spec
 cd $WORK_DIR
 print_message $BLUE "🔄 Processing V1 specification..."
-node splitspecwithoutdefinitions.js v1.swagger.json
+node splitspecwithoutdefinitions.js v1.swagger.json 2>&1 | grep -i "error" || true
 
 # Generate AsciiDoc for V1
 print_message $BLUE "📄 Generating AsciiDoc files for V1..."
@@ -131,14 +131,14 @@ done
 # Update AsciiDoc files for V1
 print_message $BLUE "🔧 Updating AsciiDoc files for V1..."
 find "rest_api/v1" -type f -name "*.adoc" | while read -r adoc_file; do
-    node updateasciidoc.js "$adoc_file"
+    node updateasciidoc.js "$adoc_file" > /dev/null 2>&1 || print_message $RED "❌ Error updating $adoc_file"
 done
 print_message $GREEN "✅ Processed V1 specification."
 
 # 4. Process V2 spec
 print_message $BLUE "🔄 Processing V2 specification..."
 rm -rf specs
-node splitspecwithoutdefinitions.js v2.swagger.json
+node splitspecwithoutdefinitions.js v2.swagger.json 2>&1 | grep -i "error" || true
 
 # Generate AsciiDoc for V2
 print_message $BLUE "📄 Generating AsciiDoc files for V2..."
@@ -180,7 +180,7 @@ done
 # Update AsciiDoc files for V2
 print_message $BLUE "🔧 Updating AsciiDoc files for V2..."
 find "rest_api/v2" -type f -name "*.adoc" | while read -r adoc_file; do
-    node updateasciidoc.js "$adoc_file"
+    node updateasciidoc.js "$adoc_file" > /dev/null 2>&1 || print_message $RED "❌ Error updating $adoc_file"
 done
 print_message $GREEN "✅ Processed V2 specification."
 
@@ -244,7 +244,11 @@ echo "" >> "$OUTPUT_FILE"
 cp -r rest_api $OPENSHIFT_DOCS_DIR/
 
 # Update the topic_map.yml file
-node updatetopicmap.js "$(cat $OUTPUT_FILE)"
+node updatetopicmap.js "$(cat $OUTPUT_FILE)" > /dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+    print_message $RED "❌ Failed to update topic map."
+    exit 1
+fi
 print_message $GREEN "✅ Created topic map."
 
 # 7. ZIP directories for artifact creation
