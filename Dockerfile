@@ -17,7 +17,7 @@ FROM openapitools/openapi-generator-cli:v7.12.0
 
 # Install Node.js and other dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends nodejs git zip && \
+    apt-get install -y --no-install-recommends nodejs zip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
