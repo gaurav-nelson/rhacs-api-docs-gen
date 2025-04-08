@@ -39,7 +39,6 @@ print_message $BLUE "Starting API docs generation for RHACS version: $VERSION"
 
 # Set working directories
 WORK_DIR="/rhacs-api-docs-gen"
-OPENSHIFT_DOCS_DIR="/openshift-docs"
 OUTPUT_DIR="/output"
 
 # Create output directory if it doesn't exist
@@ -66,25 +65,6 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 print_message $GREEN "✅ Downloaded OpenAPI specification v2."
-
-# 2. Clone openshift-docs repository
-print_message $BLUE "📂 Cloning openshift-docs repository..."
-# Extract major and minor version numbers for the branch name (e.g., 4.6.3 -> 4.6)
-BRANCH_VERSION=$(echo $VERSION | grep -oE '^[0-9]+\.[0-9]+')
-if [[ -z "$BRANCH_VERSION" ]]; then
-    print_message $RED "❌ Failed to extract branch version from $VERSION"
-    exit 1
-fi
-BRANCH_NAME="rhacs-docs-$BRANCH_VERSION"
-print_message $CYAN "Using branch: $BRANCH_NAME"
-
-git clone --depth 1 --branch $BRANCH_NAME https://github.com/openshift/openshift-docs.git $OPENSHIFT_DOCS_DIR
-if [[ $? -ne 0 ]]; then
-    print_message $RED "❌ Failed to clone branch $BRANCH_NAME. Branch may not exist."
-    exit 1
-fi
-cd $OPENSHIFT_DOCS_DIR
-print_message $GREEN "✅ Cloned openshift-docs repository with branch $BRANCH_NAME."
 
 # 3. Process V1 spec
 cd $WORK_DIR
@@ -208,17 +188,23 @@ find "rest_api/v2" -type f -name "*.adoc" | while read -r adoc_file; do
 done
 print_message $GREEN "✅ Processed $total_files V2 AsciiDoc files."
 
-# 5. Fix tags using the fix_tags.sh script
+# 5. Cleanup OpenAPI generator artifacts
+print_message $BLUE "🧹 Cleaning up OpenAPI generator artifacts..."
+find "rest_api" -name ".openapi-generator-ignore" -type f -delete
+find "rest_api" -name ".openapi-generator" -type d -exec rm -rf {} + 2>/dev/null || true
+print_message $GREEN "✅ Removed OpenAPI generator artifacts."
+
+# 6. Fix tags using the fix_tags.sh script
 print_message $BLUE "🔧 Fixing tags in AsciiDoc files..."
 bash fix_tags.sh
 print_message $GREEN "✅ Fixed tags in AsciiDoc files."
 
-# 6. Create topic map
+# 7. Create topic map
 print_message $BLUE "🗂️ Creating topic map..."
 
 # Define the root directory and output YAML file
 ROOT_DIR="rest_api"
-OUTPUT_FILE="api_reference.yml"
+OUTPUT_FILE="_topic_map.yml"
 
 # Start the YAML structure
 echo "---" > "$OUTPUT_FILE"
@@ -263,32 +249,21 @@ done
 
 # Add new line at the end of the file
 echo "" >> "$OUTPUT_FILE"
-
-# Copy the rest_api directory to the openshift-docs repo
-cp -r rest_api $OPENSHIFT_DOCS_DIR/
-
-# Update the topic_map.yml file
-node updatetopicmap.js "$(cat $OUTPUT_FILE)" > /dev/null 2>&1
-if [[ $? -ne 0 ]]; then
-    print_message $RED "❌ Failed to update topic map."
-    exit 1
-fi
 print_message $GREEN "✅ Created topic map."
 
 # 7. ZIP directories for artifact creation
 print_message $BLUE "📦 Creating ZIP archive of documentation..."
-cd $OPENSHIFT_DOCS_DIR
 
 # Create a temporary directory for the specific content
 mkdir -p /tmp/docs_export
-cp -r _topic_maps /tmp/docs_export/
+cp _topic_map.yml /tmp/docs_export/
 cp -r rest_api /tmp/docs_export/
 
 # Create the ZIP from the temporary directory
 cd /tmp/docs_export
-zip -rq "${OUTPUT_DIR}/${VERSION}_api_docs.zip" _topic_maps rest_api
+zip -rq "${OUTPUT_DIR}/${VERSION}_api_docs.zip" _topic_map.yml rest_api
 
-print_message $GREEN "✅ Created ZIP archive: ${VERSION}_api_docs.zip containing only _topic_maps and rest_api directories"
+print_message $GREEN "✅ Created ZIP archive: ${VERSION}_api_docs.zip containing only _topic_map.yml and rest_api directory"
 
 # Clean up
 print_message $BLUE "🧹 Cleaning up..."
