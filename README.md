@@ -13,7 +13,7 @@ To generate the documentation:
    ```bash
     cd openshift-docs
     git checkout -b <branch-name>
-    ```
+   ```
 2. Pull the latest image:
    ```bash
     docker pull quay.io/ganelson/rhacs-api-docs-gen
@@ -21,12 +21,16 @@ To generate the documentation:
 2. Run the docker container to generate the documentation:
    ```bash
     docker run --rm -it -v "$(pwd)":/openshift-docs quay.io/ganelson/rhacs-api-docs-gen generate
-    ```
+   ```
 3. Enter the version of RHACS you want to generate the documentation for:
    ```bash
     Please provide the version number of the RHACS release (e.g., 4.6.0): <version>
-    ```
+   ```
 4. `rhacs-api-docs-gen` generates the documentation in the `rest_api` directory and updates the `_topic_map.yml` file with the new API documentation.
+5. Run the portal build verification script to ensure everything is correct:
+   ```bash
+    ./scripts/prow-smoke-test.sh -a openshift-acs "Red Hat Advanced Cluster Security" "<version>"
+   ```
 
 ## Known Issues
 
@@ -84,3 +88,5 @@ You must run the Prow smoke test script and check for Pantheon build errors.
 
 ![image](https://github.com/user-attachments/assets/9388c883-9527-4177-a4e8-2e82f5338562)
 
+## AI-generated content
+Parts of the scripts were generated using AI tools.
