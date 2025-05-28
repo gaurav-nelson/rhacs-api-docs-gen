@@ -1,5 +1,5 @@
 # Stage 1: Build the Node.js dependencies
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 
 # Set the working directory
 WORKDIR /app
@@ -13,7 +13,7 @@ RUN npm ci && \
     rm -rf /app/node_modules/.cache
 
 # Stage 2: Create the final image
-FROM openapitools/openapi-generator-cli:v7.12.0
+FROM openapitools/openapi-generator-cli:v7.13.0
 
 # Install Node.js and other dependencies
 RUN apt-get update && \

@@ -5,163 +5,203 @@ function splitOpenApiSpec(inputFilePath) {
     // Read the input OpenAPI spec
     const inputSpec = JSON.parse(fs.readFileSync(inputFilePath, 'utf8'));
 
-    // Create a map to hold paths by tags
-    const tagMap = {};
-    let changesMade = 0; // Track changes made to references
+    let changesMadeToRefValues = 0; // Track changes made to $ref values for standardization
+    let filesCreated = 0; // Will be incremented for common_object_reference.json only once if merged
 
     // Function to uppercase the first character of a string
     function uppercaseFirstChar(str) {
+        if (typeof str !== 'string' || str.length === 0) {
+            return str;
+        }
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
-    // Function to update references to match definitions
-    function replaceRefValues(obj) {
-        if (typeof obj === 'object') {
+    // Function to standardize definition references (uppercase first letter of definition name)
+    // This function ensures that $ref paths within definitions are consistently formatted.
+    function standardizeDefinitionRefsInObject(obj) {
+        if (typeof obj === 'object' && obj !== null) {
             for (const key in obj) {
-                if (key === '$ref' && obj[key].includes('#/definitions/')) {
-                    const refValue = obj[key].split('#/definitions/')[1];
-                    if (refValue[0] === refValue[0].toLowerCase()) {
-                        obj[key] = `#/definitions/${uppercaseFirstChar(refValue)}`;
-                        changesMade++;
+                if (obj.hasOwnProperty(key)) {
+                    if (key === '$ref' && typeof obj[key] === 'string' && obj[key].startsWith('#/definitions/')) {
+                        const defName = obj[key].substring('#/definitions/'.length);
+                        const uppercasedDefName = uppercaseFirstChar(defName);
+                        const newRef = `#/definitions/${uppercasedDefName}`; // Internal refs always use this full path
+
+                        if (obj[key] !== newRef) {
+                            obj[key] = newRef;
+                            changesMadeToRefValues++;
+                        }
+                    } else {
+                        standardizeDefinitionRefsInObject(obj[key]);
                     }
-                } else if (typeof obj[key] === 'object') {
-                    replaceRefValues(obj[key]);
                 }
+            }
+        } else if (Array.isArray(obj)) {
+            for (let i = 0; i < obj.length; i++) {
+                standardizeDefinitionRefsInObject(obj[i]);
             }
         }
     }
 
-    // Update references in the input spec
-    replaceRefValues(inputSpec);
-
-    // Function to collect definitions from a schema reference
-    function collectDefinitions(tag, schema, definitions) {
-        if (schema.$ref) {
-                        const refName = schema.$ref.split('/').pop(); // Get the last part after the last '/'
-                        // Perform a case-insensitive search for the definition
-                        const matchingDefinition = Object.keys(definitions).find(defName => defName.toLowerCase() === refName.toLowerCase());
-                        if (matchingDefinition && !tagMap[tag].definitions[uppercaseFirstChar(matchingDefinition)]) {
-                            // Add the definition with the first character uppercased
-                            tagMap[tag].definitions[uppercaseFirstChar(matchingDefinition)] = definitions[matchingDefinition];
-                            // Recursively collect definitions from the referenced definition
-                            collectDefinitions(tag, definitions[matchingDefinition], definitions);
-                        }
-                    } else if (schema.type === 'object' && schema.properties) {
-                        for (const [propName, prop] of Object.entries(schema.properties)) {
-                            collectDefinitions(tag, prop, definitions);
-                            // Handle error property
-                            if (propName === 'error' && prop.$ref) {
-                                const errorRefName = prop.$ref.split('/').pop();
-                                const matchingErrorDefinition = Object.keys(definitions).find(defName => defName.toLowerCase() === errorRefName.toLowerCase());
-                                if (matchingErrorDefinition && !tagMap[tag].definitions[uppercaseFirstChar(matchingErrorDefinition)]) {
-                                    tagMap[tag].definitions[uppercaseFirstChar(matchingErrorDefinition)] = definitions[matchingErrorDefinition];
-                                    collectDefinitions(tag, definitions[matchingErrorDefinition], definitions);
-                                }
-                            }
-                        }
-                    } else if (schema.type === 'array' && schema.items) {
-                        collectDefinitions(tag, schema.items, definitions);
-                    } else if (schema.allOf) {
-                        for (const subSchema of schema.allOf) {
-                            collectDefinitions(tag, subSchema, definitions);
-                        }
-                    } else if (schema.properties) {
-                        for (const prop of Object.values(schema.properties)) {
-                            collectDefinitions(tag, prop, definitions);
-                        }
-                    } else if (schema.items) {
-                        collectDefinitions(tag, schema.items, definitions);
-                    } else if (schema.oneOf) {
-                        for (const subSchema of schema.oneOf) {
-                            collectDefinitions(tag, subSchema, definitions);
-                        }
-                    } else if (schema.anyOf) {
-                        for (const subSchema of schema.anyOf) {
-                            collectDefinitions(tag, subSchema, definitions);
-                        }
-                    } else if (schema.additionalProperties) {
-                        collectDefinitions(tag, schema.additionalProperties, definitions);
+    // Function to update $ref paths in tag-specific files to point to the common definitions file
+    function pointRefsToCommonFile(obj, commonFileRelativePath) {
+        if (typeof obj === 'object' && obj !== null) {
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                    if (key === '$ref' && typeof obj[key] === 'string' && obj[key].startsWith('#/definitions/')) {
+                        const defName = obj[key].substring('#/definitions/'.length); // Assumes defName is already uppercased
+                        obj[key] = `${commonFileRelativePath}#/definitions/${defName}`; // e.g., ./common_object_reference.json#/definitions/MyDefinition
+                    } else {
+                        pointRefsToCommonFile(obj[key], commonFileRelativePath);
                     }
-    }
-
-    // Function to collect definitions from various parts of the OpenAPI spec
-    function collectFromSpec(tag, specPart) {
-        if (specPart.responses) {
-            for (const response of Object.values(specPart.responses)) {
-                if (response.schema) {
-                    collectDefinitions(tag, response.schema, inputSpec.definitions);
                 }
             }
-        }
-
-        if (specPart.requestBody && specPart.requestBody.content) {
-            for (const contentType of Object.keys(specPart.requestBody.content)) {
-                const schema = specPart.requestBody.content[contentType].schema;
-                if (schema) {
-                    collectDefinitions(tag, schema, inputSpec.definitions);
-                }
-            }
-        }
-
-        if (specPart.parameters) {
-            for (const parameter of specPart.parameters) {
-                if (parameter.schema) {
-                    collectDefinitions(tag, parameter.schema, inputSpec.definitions);
-                }
+        } else if (Array.isArray(obj)) {
+            for (let i = 0; i < obj.length; i++) {
+                pointRefsToCommonFile(obj[i], commonFileRelativePath);
             }
         }
     }
 
-    // Iterate through paths and group them by tags
-    for (const [pathKey, pathValue] of Object.entries(inputSpec.paths)) {
-        for (const method of Object.keys(pathValue)) {
-            const tags = pathValue[method].tags || [];
-            for (const tag of tags) {
-                if (!tagMap[tag]) {
-                    tagMap[tag] = {
-                        swagger: inputSpec.swagger,
-                        info: inputSpec.info,
-                        consumes: inputSpec.consumes,
-                        produces: inputSpec.produces,
-                        paths: {},
-                        definitions: {}
-                    };
-                }
-                // Add the path to the corresponding tag
-                tagMap[tag].paths[pathKey] = pathValue;
-
-                // Collect definitions from the current path's spec
-                collectFromSpec(tag, pathValue[method]);
-            }
-        }
-    }
-
-    // Write each tag's spec to a separate file
-    let filesCreated = 0; // Track the number of files created
-
-    // Create the 'specs' directory if it doesn't exist
+    // --- Step 1: Create the 'specs' directory ---
     const specsDir = path.join(__dirname, 'specs');
     if (!fs.existsSync(specsDir)) {
         fs.mkdirSync(specsDir);
     }
 
-    for (const [tag, spec] of Object.entries(tagMap)) {
-        const outputFilePath = path.join(specsDir, `${tag}.json`); // Update the path to the 'specs' directory
-        fs.writeFileSync(outputFilePath, JSON.stringify(spec, null, 2));
-        filesCreated++;
+    // --- Step 2: Process and Save/Merge Definitions into common_object_reference.json ---
+    const commonDefsFileRelativePath = './common_object_reference.json';
+    const commonDefsFileAbsolutePath = path.join(specsDir, 'common_object_reference.json');
+    let commonDefinitionsFileContent;
+
+    if (fs.existsSync(commonDefsFileAbsolutePath)) {
+        // Load existing common definitions if file exists
+        commonDefinitionsFileContent = JSON.parse(fs.readFileSync(commonDefsFileAbsolutePath, 'utf8'));
+        // Ensure essential fields are present
+        commonDefinitionsFileContent.swagger = commonDefinitionsFileContent.swagger || inputSpec.swagger;
+        commonDefinitionsFileContent.info = commonDefinitionsFileContent.info || JSON.parse(JSON.stringify(inputSpec.info));
+        commonDefinitionsFileContent.paths = commonDefinitionsFileContent.paths || {};
+        commonDefinitionsFileContent.definitions = commonDefinitionsFileContent.definitions || {};
+        if (inputSpec.consumes && (!commonDefinitionsFileContent.consumes || commonDefinitionsFileContent.consumes.length === 0)) {
+            commonDefinitionsFileContent.consumes = [...inputSpec.consumes];
+        }
+        if (inputSpec.produces && (!commonDefinitionsFileContent.produces || commonDefinitionsFileContent.produces.length === 0)) {
+            commonDefinitionsFileContent.produces = [...inputSpec.produces];
+        }
+         if (inputSpec.tags && (!commonDefinitionsFileContent.tags || commonDefinitionsFileContent.tags.length === 0)) {
+             commonDefinitionsFileContent.tags = JSON.parse(JSON.stringify(inputSpec.tags));
+        }
+
+
+    } else {
+        // Initialize if file doesn't exist
+        commonDefinitionsFileContent = {
+            swagger: inputSpec.swagger,
+            info: JSON.parse(JSON.stringify(inputSpec.info)),
+            consumes: inputSpec.consumes ? [...inputSpec.consumes] : undefined,
+            produces: inputSpec.produces ? [...inputSpec.produces] : undefined,
+            paths: {}, // Add empty paths object for OpenAPI compliance
+            definitions: {}
+        };
+        if (inputSpec.tags) {
+            commonDefinitionsFileContent.tags = JSON.parse(JSON.stringify(inputSpec.tags));
+        }
+        filesCreated++; // Count file creation only once
     }
 
-    // Output the results
-    console.log(`Made ${changesMade} changes to $ref values`);
-    console.log(`Created ${filesCreated} files`);
+    // Process and merge definitions from the current inputSpec
+    if (inputSpec.definitions) {
+        for (const [defName, defValue] of Object.entries(inputSpec.definitions)) {
+            const uppercasedDefName = uppercaseFirstChar(defName);
+            const clonedDefValue = JSON.parse(JSON.stringify(defValue));
+            // Standardize refs *within* this definition object to be #/definitions/AnotherDef
+            standardizeDefinitionRefsInObject(clonedDefValue);
+            commonDefinitionsFileContent.definitions[uppercasedDefName] = clonedDefValue; // Add or overwrite
+        }
+    }
+
+    fs.writeFileSync(commonDefsFileAbsolutePath, JSON.stringify(commonDefinitionsFileContent, null, 2));
+
+    // --- Step 3: Prepare Main Spec for Splitting (Tag-specific files) ---
+    const specForSplitting = JSON.parse(JSON.stringify(inputSpec));
+    delete specForSplitting.definitions; // Remove definitions from tag-specific files
+
+    // Standardize $refs in the paths and other parts of the specForSplitting to use uppercased definition names
+    // e.g., #/definitions/someName -> #/definitions/SomeName
+    standardizeDefinitionRefsInObject(specForSplitting);
+
+    // Point $refs to the common definitions file, ensuring the path includes #/definitions/
+    // e.g., #/definitions/SomeName -> ./common_object_reference.json#/definitions/SomeName
+    pointRefsToCommonFile(specForSplitting, commonDefsFileRelativePath);
+
+
+    // --- Step 4: Split Paths by Tag ---
+    const tagMap = {};
+    if (specForSplitting.paths) {
+        for (const [pathKey, pathValue] of Object.entries(specForSplitting.paths)) {
+            for (const method of Object.keys(pathValue)) {
+                const operation = pathValue[method];
+                const operationTags = operation.tags || [];
+                for (const tag of operationTags) {
+                    if (!tagMap[tag]) {
+                        tagMap[tag] = {
+                            swagger: specForSplitting.swagger,
+                            info: JSON.parse(JSON.stringify(specForSplitting.info)),
+                            consumes: specForSplitting.consumes ? [...specForSplitting.consumes] : undefined,
+                            produces: specForSplitting.produces ? [...specForSplitting.produces] : undefined,
+                            paths: {},
+                            tags: []
+                        };
+                        if (inputSpec.tags && Array.isArray(inputSpec.tags)) {
+                            const currentTagObject = inputSpec.tags.find(t => t.name === tag);
+                            if (currentTagObject) {
+                                tagMap[tag].tags.push(JSON.parse(JSON.stringify(currentTagObject)));
+                            }
+                        }
+                    }
+                    if (!tagMap[tag].paths[pathKey]) {
+                        tagMap[tag].paths[pathKey] = {};
+                    }
+                    tagMap[tag].paths[pathKey][method] = operation;
+                }
+            }
+        }
+    }
+
+    // --- Step 5: Write Tag-Specific Files ---
+    let tagSpecificFilesCreated = 0;
+    for (const [tag, spec] of Object.entries(tagMap)) {
+        const outputFilePath = path.join(specsDir, `${tag}.json`);
+        fs.writeFileSync(outputFilePath, JSON.stringify(spec, null, 2));
+        tagSpecificFilesCreated++;
+    }
+    // Adjust filesCreated to reflect total files (common + tag-specific)
+    // If common file was pre-existing, filesCreated is 0 initially for it.
+    // If it was new, filesCreated is 1. Then add tagSpecificFilesCreated.
+    // This logic is a bit complex due to potential merging.
+    // Let's simplify the log message for now.
+
+    console.log(`Made ${changesMadeToRefValues} changes to $ref values (standardizing to uppercase).`);
+    console.log(`Processed definitions into ${commonDefsFileAbsolutePath}.`);
+    console.log(`Created ${tagSpecificFilesCreated} tag-specific spec files in ${specsDir}.`);
 }
 
-// Get the input file path from command line arguments
-const inputFilePath = process.argv[2];
-if (!inputFilePath) {
-    console.error('Please provide the path to the OpenAPI spec JSON file.');
-    process.exit(1);
+if (require.main === module) {
+    const inputFilePathArg = process.argv[2];
+    if (!inputFilePathArg) {
+        console.error('Usage: node splitspec.js <path-to-openapi-spec.json>');
+        console.error('Please provide the path to the OpenAPI spec JSON file.');
+        process.exit(1);
+    }
+    console.log(`Processing OpenAPI spec: ${inputFilePathArg}`);
+    try {
+        splitOpenApiSpec(inputFilePathArg);
+        console.log(`Successfully processed OpenAPI specification: ${inputFilePathArg}`);
+    } catch (error) {
+        console.error("Error processing the OpenAPI spec:", error.message);
+        console.error(error.stack);
+        process.exit(1);
+    }
 }
 
-// Run the function
-splitOpenApiSpec(inputFilePath);
+module.exports = { splitOpenApiSpec };

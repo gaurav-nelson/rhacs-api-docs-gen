@@ -89,15 +89,15 @@ print_message $GREEN "✅ Cloned openshift-docs repository with branch $BRANCH_N
 # 3. Process V1 spec
 cd $WORK_DIR
 print_message $BLUE "🔄 Processing V1 specification..."
-node splitspecwithoutdefinitions.js v1.swagger.json 2>&1 | grep -i "error" || true
+node splitspec.js v1.swagger.json 2>&1 | grep -i "error" || true
 
 # Generate AsciiDoc for V1
 print_message $BLUE "📄 Generating AsciiDoc files for V1..."
-mkdir -p "rest_api/v1"
+mkdir -p "rest_api"
 
 for tag_dir in specs/*/; do
     tag_name=$(basename "$tag_dir")
-    output_tag_dir="rest_api/v1/$tag_name"
+    output_tag_dir="rest_api/$tag_name"
     mkdir -p "$output_tag_dir"
 
     for spec_file in "$tag_dir"/*.json; do
@@ -130,11 +130,11 @@ done
 
 # Update AsciiDoc files for V1
 print_message $BLUE "🔧 Updating AsciiDoc files for V1..."
-total_files=$(find "rest_api/v1" -type f -name "*.adoc" | wc -l)
+total_files=$(find "rest_api" -type f -name "*.adoc" | wc -l)
 current=0
 progress_step=$((total_files / 10 > 0 ? total_files / 10 : 1))  # Show progress every ~10% or at least every file
 
-find "rest_api/v1" -type f -name "*.adoc" | while read -r adoc_file; do
+find "rest_api" -type f -name "*.adoc" | while read -r adoc_file; do
     current=$((current + 1))
 
     # Show progress at intervals
@@ -150,15 +150,14 @@ print_message $GREEN "✅ Processed $total_files V1 AsciiDoc files."
 # 4. Process V2 spec
 print_message $BLUE "🔄 Processing V2 specification..."
 rm -rf specs
-node splitspecwithoutdefinitions.js v2.swagger.json 2>&1 | grep -i "error" || true
+node splitspec.js v2.swagger.json 2>&1 | grep -i "error" || true
 
-# Generate AsciiDoc for V2
+# Generate AsciiDoc for V2 (merge into existing rest_api structure)
 print_message $BLUE "📄 Generating AsciiDoc files for V2..."
-mkdir -p "rest_api/v2"
 
 for tag_dir in specs/*/; do
     tag_name=$(basename "$tag_dir")
-    output_tag_dir="rest_api/v2/$tag_name"
+    output_tag_dir="rest_api/$tag_name"
     mkdir -p "$output_tag_dir"
 
     for spec_file in "$tag_dir"/*.json; do
@@ -191,11 +190,11 @@ done
 
 # Update AsciiDoc files for V2
 print_message $BLUE "🔧 Updating AsciiDoc files for V2..."
-total_files=$(find "rest_api/v2" -type f -name "*.adoc" | wc -l)
+total_files=$(find "rest_api" -type f -name "*.adoc" | wc -l)
 current=0
 progress_step=$((total_files / 10 > 0 ? total_files / 10 : 1))  # Show progress every ~10% or at least every file
 
-find "rest_api/v2" -type f -name "*.adoc" | while read -r adoc_file; do
+find "rest_api" -type f -name "*.adoc" | while read -r adoc_file; do
     current=$((current + 1))
 
     # Show progress at intervals
@@ -206,7 +205,7 @@ find "rest_api/v2" -type f -name "*.adoc" | while read -r adoc_file; do
 
     node updateasciidoc.js "$adoc_file" > /dev/null 2>&1 || print_message $RED "❌ Error updating $adoc_file"
 done
-print_message $GREEN "✅ Processed $total_files V2 AsciiDoc files."
+print_message $GREEN "✅ Processed $total_files total AsciiDoc files (V1 + V2)."
 
 # 5. Fix tags using the fix_tags.sh script
 print_message $BLUE "🔧 Fixing tags in AsciiDoc files..."
