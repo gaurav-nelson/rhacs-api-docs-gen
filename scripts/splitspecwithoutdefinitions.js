@@ -175,3 +175,6 @@ if (!inputFilePath) {
 
 // Run the function
 splitOpenApiSpecWithoutDefinitions(inputFilePath);
+
+// Export the function for use in other modules
+module.exports = { splitOpenApiSpecWithoutDefinitions };
