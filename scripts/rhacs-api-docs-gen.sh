@@ -46,17 +46,23 @@ show_help() {
     echo -e "${CYAN}"
     print_banner
     printf "${NC}"
-    printf "${BLUE}Usage: bash rhacs-api-docs-gen.sh [command]${NC}\n"
+    printf "${BLUE}Usage: bash rhacs-api-docs-gen.sh [command] [version]${NC}\n"
     printf "${YELLOW}Commands:${NC}\n"
-    printf "  generate  Download the OpenAPI spec and generate AsciiDoc files.\n"
-    printf "  clean     Remove the 'rest_api' directory and other generated files.\n"
-    printf "  help      Show this help message.\n"
+    printf "  generate [version]  Download the OpenAPI spec and generate AsciiDoc files.\n"
+    printf "                      Version can be provided as argument (e.g., 4.8.0) or entered interactively.\n"
+    printf "  clean               Remove the 'rest_api' directory and other generated files.\n"
+    printf "  help                Show this help message.\n"
 }
 
-# Function to prompt for version number
-prompt_for_version() {
-    read -p "$(print_message $YELLOW 'Enter the version number of the RHACS release (e.g., 4.6.0): ')" version_input
-    echo $version_input
+# Function to get version number (from argument or prompt)
+get_version() {
+    local provided_version=$1
+    if [ -n "$provided_version" ]; then
+        echo "$provided_version"
+    else
+        read -p "$(print_message $YELLOW 'Enter the version number of the RHACS release (e.g., 4.6.0): ')" version_input
+        echo "$version_input"
+    fi
 }
 
 # Function to download the OpenAPI specifications
@@ -319,7 +325,7 @@ copy_generator_files() {
 case "$1" in
 generate)
     print_banner
-    release_version=$(prompt_for_version)
+    release_version=$(get_version "$2")
 
     # Clean specs directory before starting to ensure a fresh common_object_reference.json
     if [ -d "specs" ]; then
